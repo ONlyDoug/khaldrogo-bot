@@ -1,10 +1,11 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-# ----- MUDANÇA CRÍTICA AQUI -----
 from discord.ui import Modal, TextInput
+# ----- MUDANÇA CRÍTICA AQUI -----
+# Trocamos 'InputTextStyle' por 'TextStyle' na importação direta
+from discord import TextStyle, Option, Forbidden, utils 
 # ---------------------------------
-from discord import InputTextStyle, Option, Forbidden, utils
 
 # --- 1. Definição do Modal (Formulário) ---
 class CTAModal(Modal):
@@ -37,7 +38,10 @@ class CTAModal(Modal):
         self.add_item(TextInput(
             label="Observações (Opcional)",
             placeholder="Ex: T8.3 equivalente. Trazer comida e poções.",
-            style=InputTextStyle.paragraph,
+            # ----- MUDANÇA CRÍTICA AQUI -----
+            # Usamos TextStyle.paragraph em vez de InputTextStyle.paragraph
+            style=TextStyle.paragraph, 
+            # ---------------------------------
             required=False
         ))
         # ---------------------------------
@@ -50,7 +54,11 @@ class CTAModal(Modal):
         if not target_channel:
             await interaction.followup.send(f"Erro Crítico: Canal de CTA (ID: {self.target_channel_id}) não foi encontrado.", ephemeral=True)
             return
-        embed = discord.Embed( title=f"📢 {self.inputs[0].value}", description=f"**Data/Hora:** {self.inputs[1].value}\n**Tipo:** {self.cta_type_display}", color=self.embed_color)
+        embed = discord.Embed(
+            title=f"📢 {self.inputs[0].value}",
+            description=f"**Data/Hora:** {self.inputs[1].value}\n**Tipo:** {self.cta_type_display}",
+            color=self.embed_color
+        )
         if self.inputs[2].value:
             embed.add_field(name="Observações", value=self.inputs[2].value, inline=False)
         embed.set_footer(text=f"CTA criada por: {interaction.user.display_name}")

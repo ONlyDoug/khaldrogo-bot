@@ -64,12 +64,32 @@ async def create_roles(guild):
     print("Criação de Cargos concluída.")
     return r
 async def setup_publico(guild, roles):
+    """Cria a Categoria PÚBLICO"""
     print("Configurando Categoria: PÚBLICO...")
     cat = await get_or_create_category(guild, "🌎 CATEGORIA: PÚBLICO")
-    ow = { roles["everyone"]: discord.PermissionOverwrite(read_messages=True, send_messages=False) }
-    ch = await get_or_create_channel(guild, "📢 | anuncios-publicos", cat, overwrites=ow)
-    ow = { roles["everyone"]: discord.PermissionOverwrite(read_messages=True, send_messages=True) } 
-    ch = await get_or_create_channel(guild, "✅ | recrutamento", cat, overwrites=ow)
+    
+    # Canal de Anúncios
+    ow_anuncios = { roles["everyone"]: discord.PermissionOverwrite(read_messages=True, send_messages=False) }
+    ch_anuncios = await get_or_create_channel(guild, "📢 | anuncios-publicos", cat, overwrites=ow_anuncios)
+    # --- LÓGICA ADICIONADA PARA MENSAGEM ---
+    if not [msg async for msg in ch_anuncios.history(limit=1)]:
+        await ch_anuncios.send(
+            "Este é o canal de **Anúncios Públicos**.\n\n"
+            "Fique de olho aqui para novidades importantes sobre o *core* que são abertas a todos."
+        )
+    # -----------------------------------------
+
+    # Canal de Recrutamento
+    ow_recrutamento = { roles["everyone"]: discord.PermissionOverwrite(read_messages=True, send_messages=True) } # Permitir /aplicar
+    ch_recrutamento = await get_or_create_channel(guild, "✅ | recrutamento", cat, overwrites=ow_recrutamento)
+    # --- LÓGICA ADICIONADA PARA MENSAGEM ---
+    if not [msg async for msg in ch_recrutamento.history(limit=1)]:
+        await ch_recrutamento.send(
+            "**Bem-vindo ao Recrutamento!**\n\n"
+            "Para se aplicar ao nosso *core*, por favor, use o comando `/aplicar` "
+            "(que será configurado no bot) ou aguarde instruções de um Oficial."
+        )
+    # -----------------------------------------
 async def setup_recepcao(guild, roles):
     print("Configurando Categoria: RECEPÇÃO...")
     ow_cat = { roles["everyone"]: discord.PermissionOverwrite(read_messages=False), roles["recruta"]: discord.PermissionOverwrite(read_messages=True), roles["mercenario"]: discord.PermissionOverwrite(read_messages=False), roles["oficial"]: discord.PermissionOverwrite(read_messages=True), }
