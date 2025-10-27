@@ -17,6 +17,7 @@ if not TOKEN:
 intents = discord.Intents.default()
 intents.guilds = True    # Necessário para gerir cargos/canais
 intents.members = True   # Necessário para gerir membros
+intents.message_content = True  # Habilita leitura do conteúdo das mensagens (necessário para wait_for checks)
 
 # --- 3. Inicialização do Bot ---
 # Usamos commands.Bot para carregar Cogs, mas não definimos comandos de prefixo

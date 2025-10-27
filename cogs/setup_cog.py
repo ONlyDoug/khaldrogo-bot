@@ -125,14 +125,21 @@ class SetupCog(commands.Cog):
         )
 
         def check(m):
-            # Verifica se a mensagem é do mesmo autor, no mesmo canal e tem o conteúdo exato
-            return m.author == interaction.user and m.channel == interaction.channel and m.content == "SIM APAGAR TUDO"
+            # Verifica autor, canal e conteúdo (ignora espaços e case)
+            return (
+                getattr(m.author, "id", None) == interaction.user.id
+                and getattr(m.channel, "id", None) == interaction.channel.id
+                and isinstance(m.content, str)
+                and m.content.strip().upper() == "SIM APAGAR TUDO"
+            )
 
         try:
-            confirmation_msg = await self.bot.wait_for('message', timeout=30.0, check=check)
+            confirmation_msg = await self.bot.wait_for("message", timeout=30.0, check=check)
             try:
-                await confirmation_msg.delete() # Apaga a mensagem de confirmação
-            except: pass # Ignora se não puder apagar
+                await confirmation_msg.delete()
+            except Exception:
+                # Não é crítico se não for possível apagar a mensagem de confirmação
+                pass
         except asyncio.TimeoutError:
             await interaction.followup.send("Comando cancelado. Nenhuma alteração foi feita.", ephemeral=True)
             return
@@ -150,7 +157,6 @@ class SetupCog(commands.Cog):
 
             # PASSO 1: Criar Cargos (Idempotente ainda útil aqui)
             await main_message.edit(content="PASSO 1/9: Verificando/Criando cargos...")
-            # create_roles deve estar disponível no módulo; se não estiver, adicione/importe.
             roles = await create_roles(guild)
 
             # --- PASSO 2 a 9: Recriar Categorias e Canais ---
