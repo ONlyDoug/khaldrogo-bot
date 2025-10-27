@@ -1,27 +1,50 @@
 import discord
-from discord import app_commands # IMPORTAÇÃO ADICIONADA
+from discord import app_commands
 from discord.ext import commands
-from discord.ui import Modal, InputText
+# ----- MUDANÇA CRÍTICA AQUI -----
+from discord.ui import Modal, TextInput
+# ---------------------------------
 from discord import InputTextStyle, Option, Forbidden, utils
 
 # --- 1. Definição do Modal (Formulário) ---
-# (O código da classe CTAModal permanece IDÊNTICO)
 class CTAModal(Modal):
     def __init__(self, bot, target_channel_id: int, cta_type: str):
         super().__init__(title="Criar Nova CTA")
         self.bot = bot
         self.target_channel_id = target_channel_id
+        
         if cta_type == "obrigatoria":
             self.cta_type_display = "Obrigatória"
             self.embed_color = discord.Colour.red()
         else:
             self.cta_type_display = "Opcional"
             self.embed_color = discord.Colour.blue()
-        self.add_item(InputText( label="Título da CTA", placeholder="Ex: Defesa de Território em Lymhurst", max_length=100))
-        self.add_item(InputText( label="Data e Hora", placeholder="Ex: 21/10 às 20:00 BRT (Formar 19:30)", max_length=100))
-        self.add_item(InputText( label="Observações (Opcional)", placeholder="Ex: T8.3 equivalente. Trazer comida e poções.", style=InputTextStyle.paragraph, required=False))
 
+        # --- Campos do Formulário ---
+        # ----- MUDANÇA CRÍTICA AQUI (3x) -----
+        self.add_item(TextInput(
+            label="Título da CTA",
+            placeholder="Ex: Defesa de Território em Lymhurst",
+            max_length=100
+        ))
+        
+        self.add_item(TextInput(
+            label="Data e Hora",
+            placeholder="Ex: 21/10 às 20:00 BRT (Formar 19:30)",
+            max_length=100
+        ))
+        
+        self.add_item(TextInput(
+            label="Observações (Opcional)",
+            placeholder="Ex: T8.3 equivalente. Trazer comida e poções.",
+            style=InputTextStyle.paragraph,
+            required=False
+        ))
+        # ---------------------------------
+
+    # --- 2. Lógica de 'Callback' (O que fazer após o 'submit') ---
     async def callback(self, interaction: discord.Interaction):
+        # (O código do callback permanece IDÊNTICO)
         await interaction.response.send_message("Processando sua CTA...", ephemeral=True)
         target_channel = self.bot.get_channel(self.target_channel_id)
         if not target_channel:
@@ -45,6 +68,7 @@ class CTAModal(Modal):
             await interaction.followup.send(f"Ocorreu um erro inesperado ao enviar a CTA: {e}", ephemeral=True)
             print(f"Erro ao processar CTA Modal: {e}")
 
+
 # --- 5. Definição da Cog (Módulo) ---
 class CTACog(commands.Cog):
     """Módulo responsável pela funcionalidade de Gestão de CTAs."""
@@ -53,35 +77,32 @@ class CTACog(commands.Cog):
         self.bot = bot
         print(">>> cta_cog.py FOI LIDO E INICIADO <<<")
 
-    # ----- MUDANÇA CRÍTICA AQUI -----
     @app_commands.command(
         name="cta",
         description="Cria uma nova chamada para ZvZ (Apenas Oficiais)"
     )
-    @app_commands.checks.has_permissions(manage_guild=True) # MUDANÇA AQUI
-    @app_commands.describe(tipo="Qual o tipo de CTA?") # MUDANÇA AQUI
+    @app_commands.checks.has_permissions(manage_guild=True)
+    @app_commands.describe(tipo="Qual o tipo de CTA? (obrigatoria ou opcional)") # Descrição mais clara
     async def cta(
         self,
-        interaction: discord.Interaction, # MUDANÇA AQUI
-        tipo: commands.Range[str, 1, -1], # MUDANÇA AQUI
+        interaction: discord.Interaction,
+        tipo: str, # Simplificado para string normal
     ):
         """Comando principal que abre o formulário de CTA."""
         
-        # MUDANÇA AQUI: `choices` não é mais um parâmetro do decorador
-        if tipo not in ["obrigatoria", "opcional"]:
+        tipo_lower = tipo.lower() # Converte para minúsculas para comparação
+        if tipo_lower not in ["obrigatoria", "opcional"]:
              await interaction.response.send_message("Tipo inválido. Use 'obrigatoria' ou 'opcional'.", ephemeral=True)
              return
 
-        if tipo == "obrigatoria":
+        if tipo_lower == "obrigatoria":
             channel_name = "❗ | cta-obrigatória"
-        else:
+        else: # opcional
             channel_name = "⚔️ | cta-opcional"
 
-        # MUDANÇA AQUI: `interaction.guild`
         target_channel = utils.get(interaction.guild.text_channels, name=channel_name)
         
         if not target_channel:
-            # MUDANÇA AQUI: `interaction.response.send_message`
             await interaction.response.send_message(
                 f"Erro: O canal `#{channel_name}` não foi encontrado."
                 f"Execute o `/setup-servidor` primeiro.",
@@ -89,13 +110,12 @@ class CTACog(commands.Cog):
             )
             return
         
-        modal = CTAModal(bot=self.bot, target_channel_id=target_channel.id, cta_type=tipo)
-        # MUDANÇA AQUI: `interaction.response.send_modal`
+        modal = CTAModal(bot=self.bot, target_channel_id=target_channel.id, cta_type=tipo_lower) # Passa tipo_lower
         await interaction.response.send_modal(modal)
 
+    # (O error handler @cta.error permanece IDÊNTICO)
     @cta.error
     async def cta_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        """Handler de erro específico para o /cta."""
         if isinstance(error, app_commands.MissingPermissions):
             await interaction.response.send_message("Apenas Oficiais e Líderes podem usar este comando.", ephemeral=True)
         else:
@@ -104,5 +124,6 @@ class CTACog(commands.Cog):
             print(f"Erro no comando '/cta': {error}")
 
 # --- 7. Função de Setup (Obrigatória para Cogs) ---
+# (O código da função setup permanece IDÊNTICO)
 async def setup(bot):
     await bot.add_cog(CTACog(bot))
