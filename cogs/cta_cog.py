@@ -4,7 +4,6 @@ from discord.ui import Modal, InputText
 from discord import InputTextStyle, Option, Forbidden, utils
 
 # --- 1. Definição do Modal (Formulário) ---
-# Este formulário será apresentado ao Oficial quando usar /cta
 class CTAModal(Modal):
     def __init__(self, bot, target_channel_id: int, cta_type: str):
         super().__init__(title="Criar Nova CTA")
@@ -100,7 +99,6 @@ class CTACog(commands.Cog):
     @commands.slash_command(
         name="cta",
         description="Cria uma nova chamada para ZvZ (Apenas Oficiais)"
-        # A permissão é verificada abaixo
     )
     # Restringe a quem pode gerir o servidor (Oficiais/Líderes)
     @commands.has_permissions(manage_guild=True)
@@ -127,7 +125,7 @@ class CTACog(commands.Cog):
         if not target_channel:
             await ctx.respond(
                 f"Erro: O canal `#{channel_name}` não foi encontrado."
-                f"Verifique se o comando `/setup-servidor` foi executado corretamente.",
+                f"Execute o `/setup-servidor` primeiro.",
                 ephemeral=True
             )
             return

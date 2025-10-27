@@ -1,165 +1,144 @@
 import discord
 from discord.ext import commands
+from discord.utils import get
+import asyncio
 
-# --- Helper: Get or Create Role ---
+# --- Funções Auxiliares de Criação (Idempotentes) ---
+
 async def get_or_create_role(guild: discord.Guild, name: str, **kwargs):
-    """
-    Tenta encontrar um cargo pelo nome (case-insensitive). Se não existir, cria-o.
-    Retorna o objeto do cargo (existente ou novo).
-    """
+    """ Tenta encontrar um cargo pelo nome. Se não existir, cria-o. """
+    # Procura ignorando maiúsculas/minúsculas
     existing_role = next((r for r in guild.roles if r.name.lower() == name.lower()), None)
     if existing_role:
-        print(f"Cargo '{name}' já existe. Ignorando criação.")
+        print(f"  [SKIP] Cargo '{name}' já existe.")
         return existing_role
-
-    print(f"Criando cargo '{name}'...")
+    print(f"  [CREATE] Criando cargo '{name}'...")
     return await guild.create_role(name=name, **kwargs)
 
-# --- Funções Auxiliares de Criação ---
-# (Aqui estão as funções que criam os cargos, canais e permissões)
+async def get_or_create_category(guild: discord.Guild, name: str, **kwargs):
+    """ Tenta encontrar uma categoria pelo nome. Se não existir, cria-a. """
+    existing_cat = next((c for c in guild.categories if c.name.lower() == name.lower()), None)
+    if existing_cat:
+        print(f"  [SKIP] Categoria '{name}' já existe.")
+        return existing_cat
+    print(f"  [CREATE] Criando Categoria '{name}'...")
+    return await guild.create_category(name=name, **kwargs)
+
+async def get_or_create_channel(guild: discord.Guild, name: str, category: discord.CategoryChannel = None, is_text: bool = True, **kwargs):
+    """ Tenta encontrar um canal pelo nome (dentro de uma categoria). Se não existir, cria-o. """
+    # Define onde procurar (na guilda inteira ou numa categoria específica)
+    search_scope = category.channels if category else guild.channels
+    
+    # Procura pelo canal
+    channel_type = discord.ChannelType.text if is_text else discord.ChannelType.voice
+    existing_channel = next((c for c in search_scope if c.name.lower() == name.lower() and c.type == channel_type), None)
+    
+    if existing_channel:
+        print(f"    [SKIP] Canal '{name}' já existe.")
+        # Se os overwrites (permissões) foram passados, atualiza o canal
+        if 'overwrites' in kwargs:
+            await existing_channel.edit(overwrites=kwargs['overwrites'])
+            print(f"    [UPDATE] Permissões do canal '{name}' atualizadas.")
+        return existing_channel
+    
+    print(f"    [CREATE] Criando canal '{name}'...")
+    if is_text:
+        return await guild.create_text_channel(name=name, category=category, **kwargs)
+    else:
+        return await guild.create_voice_channel(name=name, category=category, **kwargs)
+
+# --- Funções de Setup (Modificadas) ---
 
 async def create_roles(guild):
     """Cria todos os cargos necessários e retorna um dicionário."""
-    
-    # Cargos de Hierarquia (usa get_or_create_role)
-    r_recruta = await get_or_create_role(guild, name="Recruta", colour=discord.Colour.light_grey())
-    r_mercenario = await get_or_create_role(guild, name="Mercenário", colour=discord.Colour.green())
-    r_coach = await get_or_create_role(guild, name="Coach", colour=discord.Colour.blue())
-    r_shotcaller = await get_or_create_role(guild, name="Shotcaller", colour=discord.Colour.gold())
-    r_oficial = await get_or_create_role(guild, name="Oficial", colour=discord.Colour.purple())
-    r_lider = await get_or_create_role(guild, name="Líder", colour=discord.Colour.red())
-
-    # Cargos de Role
-    r_tank = await get_or_create_role(guild, name="Tank", colour=discord.Colour(0x607d8b)) # Cinza
-    r_healer = await get_or_create_role(guild, name="Healer", colour=discord.Colour(0x4caf50)) # Verde
-    r_dps = await get_or_create_role(guild, name="DPS", colour=discord.Colour(0xf44336)) # Vermelho
-    r_suporte = await get_or_create_role(guild, name="Suporte", colour=discord.Colour(0x9c27b0)) # Roxo
-
-    # Cargos de Comunicação ZvZ
-    r_lider_tank = await get_or_create_role(guild, name="Líder-Tank")
-    r_lider_healer = await get_or_create_role(guild, name="Líder-Healer")
-    r_lider_dps = await get_or_create_role(guild, name="Líder-DPS")
-    r_lider_suporte = await get_or_create_role(guild, name="Líder-Suporte")
-
-    return {
+    print("Iniciando criação de Cargos...")
+    r = {
         "everyone": guild.default_role,
-        "recruta": r_recruta,
-        "mercenario": r_mercenario,
-        "coach": r_coach,
-        "shotcaller": r_shotcaller,
-        "oficial": r_oficial,
-        "lider": r_lider,
-        "tank": r_tank,
-        "healer": r_healer,
-        "dps": r_dps,
-        "suporte": r_suporte,
-        "lider_tank": r_lider_tank,
-        "lider_healer": r_lider_healer,
-        "lider_dps": r_lider_dps,
-        "lider_suporte": r_lider_suporte,
+        "recruta": await get_or_create_role(guild, name="Recruta", colour=discord.Colour.light_grey()),
+        "mercenario": await get_or_create_role(guild, name="Mercenário", colour=discord.Colour.green()),
+        "coach": await get_or_create_role(guild, name="Coach", colour=discord.Colour.blue()),
+        "shotcaller": await get_or_create_role(guild, name="Shotcaller", colour=discord.Colour.gold()),
+        "oficial": await get_or_create_role(guild, name="Oficial", colour=discord.Colour.purple()),
+        "lider": await get_or_create_role(guild, name="Líder", colour=discord.Colour.red()),
+        "tank": await get_or_create_role(guild, name="Tank", colour=discord.Colour(0x607d8b)),
+        "healer": await get_or_create_role(guild, name="Healer", colour=discord.Colour(0x4caf50)),
+        "dps": await get_or_create_role(guild, name="DPS", colour=discord.Colour(0xf44336)),
+        "suporte": await get_or_create_role(guild, name="Suporte", colour=discord.Colour(0x9c27b0)),
+        "lider_tank": await get_or_create_role(guild, name="Líder-Tank"),
+        "lider_healer": await get_or_create_role(guild, name="Líder-Healer"),
+        "lider_dps": await get_or_create_role(guild, name="Líder-DPS"),
+        "lider_suporte": await get_or_create_role(guild, name="Líder-Suporte"),
     }
+    print("Criação de Cargos concluída.")
+    return r
 
 async def setup_publico(guild, roles):
     """Cria a Categoria PÚBLICO"""
-    cat = await guild.create_category("🌎 CATEGORIA: PÚBLICO")
+    print("Configurando Categoria: PÚBLICO...")
+    cat = await get_or_create_category(guild, "🌎 CATEGORIA: PÚBLICO")
     
-    ch = await cat.create_text_channel(
-        "📢 | anuncios-publicos",
-        overwrites={ roles["everyone"]: discord.PermissionOverwrite(read_messages=True, send_messages=False) }
-    )
-    await ch.send("Este é o canal de **Anúncios Públicos**.\n\nFique de olho aqui para novidades importantes sobre o *core* que são abertas a todos.")
+    ow = { roles["everyone"]: discord.PermissionOverwrite(read_messages=True, send_messages=False) }
+    ch = await get_or_create_channel(guild, "📢 | anuncios-publicos", cat, overwrites=ow)
+    # (Opcional: Adicionar lógica para não enviar a msg se o canal já tiver mensagens)
 
-    ch = await cat.create_text_channel("✅ | recrutamento")
-    await ch.send("**Bem-vindo ao Recrutamento!**\n\nPara se aplicar ao nosso *core*, por favor, use o comando `/aplicar` (que será configurado no bot) ou aguarde instruções de um Oficial.")
+    ow = { roles["everyone"]: discord.PermissionOverwrite(read_messages=True, send_messages=True) } # Permitir /aplicar
+    ch = await get_or_create_channel(guild, "✅ | recrutamento", cat, overwrites=ow)
 
 async def setup_recepcao(guild, roles):
     """Cria a Categoria RECEPÇÃO (Privada para Recrutas)"""
-    cat = await guild.create_category(
-        "🏁 CATEGORIA: RECEPÇÃO",
-        overwrites={
-            roles["everyone"]: discord.PermissionOverwrite(read_messages=False),
-            roles["recruta"]: discord.PermissionOverwrite(read_messages=True),
-            roles["mercenario"]: discord.PermissionOverwrite(read_messages=False),
-            roles["oficial"]: discord.PermissionOverwrite(read_messages=True),
-        }
-    )
+    print("Configurando Categoria: RECEPÇÃO...")
+    ow_cat = {
+        roles["everyone"]: discord.PermissionOverwrite(read_messages=False),
+        roles["recruta"]: discord.PermissionOverwrite(read_messages=True),
+        roles["mercenario"]: discord.PermissionOverwrite(read_messages=False),
+        roles["oficial"]: discord.PermissionOverwrite(read_messages=True),
+    }
+    cat = await get_or_create_category(guild, "🏁 CATEGORIA: RECEPÇÃO", overwrites=ow_cat)
     
-    ch = await cat.create_text_channel(
-        "🚩 | regras-e-diretrizes",
-        overwrites={ roles["recruta"]: discord.PermissionOverwrite(send_messages=False) }
-    )
-    await ch.send("Seja bem-vindo, Recruta!\n\n**LEITURA OBRIGATÓRIA:**\n\n1.  Respeite todos os membros.\n2.  Comparecimento em CTAs obrigatórias é essencial.\n3.  É obrigatório gravar suas lutas (VODs) para análise.\n4.  Regras de Regear estão em #ℹ️ | info-regear-e-loot.\n...")
-
-    ch = await cat.create_text_channel("👋 | apresente-se")
-    await ch.send("Use este canal para se apresentar!\n\nDiga-nos seu Nick no jogo, sua(s) classe(s) principal(is), seu fuso horário e um pouco sobre sua experiência em ZvZ.")
+    ow_ch = { roles["recruta"]: discord.PermissionOverwrite(send_messages=False) }
+    await get_or_create_channel(guild, "🚩 | regras-e-diretrizes", cat, overwrites=ow_ch)
     
-    ch = await cat.create_text_channel("🤖 | comandos-bot")
-    await ch.send("Use este canal para comandos do bot, como pedir builds (`!build tank`) ou verificar seus status.")
+    await get_or_create_channel(guild, "👋 | apresente-se", cat)
+    await get_or_create_channel(guild, "🤖 | comandos-bot", cat)
 
 async def setup_comunidade(guild, roles):
     """Cria a Categoria COMUNIDADE (Privada para Mercenários)"""
-    cat = await guild.create_category(
-        "🌐 CATEGORIA: COMUNIDADE",
-        overwrites={
-            roles["everyone"]: discord.PermissionOverwrite(read_messages=False),
-            roles["mercenario"]: discord.PermissionOverwrite(read_messages=True),
-            roles["oficial"]: discord.PermissionOverwrite(read_messages=True),
-        }
-    )
+    print("Configurando Categoria: COMUNIDADE...")
+    ow_cat = {
+        roles["everyone"]: discord.PermissionOverwrite(read_messages=False),
+        roles["mercenario"]: discord.PermissionOverwrite(read_messages=True),
+        roles["oficial"]: discord.PermissionOverwrite(read_messages=True),
+    }
+    cat = await get_or_create_category(guild, "🌐 CATEGORIA: COMUNIDADE", overwrites=ow_cat)
 
-    ch = await cat.create_text_channel(
-        "📣 | avisos-importantes",
-        overwrites={ roles["mercenario"]: discord.PermissionOverwrite(send_messages=False) }
-    )
-    await ch.send("Canal de **Avisos Importantes** para todos os membros do *core*.\n\nFiquem atentos aqui para anúncios de CTAs, mudanças de regras e outras informações essenciais.")
-
-    ch = await cat.create_text_channel("💬 | chat-geral")
-    await ch.send("Este é o *chat-geral*. Sinta-se à vontade para conversar, enviar memes e socializar.")
-
-    await cat.create_text_channel("🎬 | highlights-e-clips")
-    await cat.create_text_channel("💰 | loot-e-sorteios")
-    await cat.create_voice_channel("🎧 Lobby Geral")
+    ow_ch = { roles["mercenario"]: discord.PermissionOverwrite(send_messages=False) }
+    await get_or_create_channel(guild, "📣 | avisos-importantes", cat, overwrites=ow_ch)
+    
+    await get_or_create_channel(guild, "💬 | chat-geral", cat)
+    await get_or_create_channel(guild, "🎬 | highlights-e-clips", cat)
+    await get_or_create_channel(guild, "💰 | loot-e-sorteios", cat)
+    await get_or_create_channel(guild, "🎧 Lobby Geral", cat, is_text=False)
 
 async def setup_zvz(guild, roles):
     """Cria a Categoria OPERAÇÕES ZVZ (Privada para Mercenários)"""
-    cat = await guild.create_category(
-        "⚔️ CATEGORIA: OPERAÇÕES ZVZ",
-        overwrites={
-            roles["everyone"]: discord.PermissionOverwrite(read_messages=False),
-            roles["mercenario"]: discord.PermissionOverwrite(read_messages=True),
-            roles["oficial"]: discord.PermissionOverwrite(read_messages=True),
-        }
-    )
+    print("Configurando Categoria: OPERAÇÕES ZVZ...")
+    ow_cat = {
+        roles["everyone"]: discord.PermissionOverwrite(read_messages=False),
+        roles["mercenario"]: discord.PermissionOverwrite(read_messages=True),
+        roles["oficial"]: discord.PermissionOverwrite(read_messages=True),
+    }
+    cat = await get_or_create_category(guild, "⚔️ CATEGORIA: OPERAÇÕES ZVZ", overwrites=ow_cat)
 
-    ch = await cat.create_text_channel(
-        "❗ | cta-obrigatória",
-        overwrites={ roles["mercenario"]: discord.PermissionOverwrite(send_messages=False) }
-    )
-    await ch.send("Canal para **CTAs Obrigatórias** (Territórios, Castelos, etc.).\n\nO bot irá postar as chamadas aqui. Reaja com ✅ (Presente), ❌ (Ausente) ou ❓ (Dúvida).")
-
-    ch = await cat.create_text_channel(
-        "⚔️ | cta-opcional",
-        overwrites={ roles["mercenario"]: discord.PermissionOverwrite(send_messages=False) }
-    )
-    await ch.send("Canal para **CTAs Opcionais** (Fame Farm, Gank, Conteúdo secundário).\n\nConfirme presença da mesma forma.")
+    ow_ch_cta = { roles["mercenario"]: discord.PermissionOverwrite(send_messages=False) }
+    await get_or_create_channel(guild, "❗ | cta-obrigatória", cat, overwrites=ow_ch_cta)
+    await get_or_create_channel(guild, "⚔️ | cta-opcional", cat, overwrites=ow_ch_cta)
+    await get_or_create_channel(guild, "📅 | registro-cta", cat, overwrites=ow_ch_cta)
+    await get_or_create_channel(guild, "📜 | builds-oficiais", cat, overwrites=ow_ch_cta)
     
-    ch = await cat.create_text_channel(
-        "📅 | registro-cta",
-        overwrites={ roles["mercenario"]: discord.PermissionOverwrite(send_messages=False) }
-    )
-    await ch.send("Este canal é um **log automático** do bot.\n\nEle mostrará a lista de quem confirmou presença nas CTAs para facilitar a organização dos líderes.")
-
-    ch = await cat.create_text_channel(
-        "📜 | builds-oficiais",
-        overwrites={ roles["mercenario"]: discord.PermissionOverwrite(send_messages=False) }
-    )
-    await ch.send("Aqui estarão fixadas as **Builds Oficiais** do *core*.\n\nUsar a *build* correta é obrigatório. Use o comando `!build [role]` para ver a sua.")
-
-    await cat.create_text_channel("🗺️ | estratégia-e-mapa")
+    await get_or_create_channel(guild, "🗺️ | estratégia-e-mapa", cat)
+    await get_or_create_channel(guild, "🗣️ Concentração ZvZ", cat, is_text=False)
     
-    await cat.create_voice_channel("🗣️ Concentração ZvZ")
-    
-    ch_comando_overwrites = {
+    ow_ch_comando = {
         roles["everyone"]: discord.PermissionOverwrite(read_messages=True, connect=True),
         roles["mercenario"]: discord.PermissionOverwrite(speak=False), # Mercenário NÃO FALA
         roles["lider"]: discord.PermissionOverwrite(speak=True, priority_speaker=True),
@@ -170,119 +149,85 @@ async def setup_zvz(guild, roles):
         roles["lider_dps"]: discord.PermissionOverwrite(speak=True),
         roles["lider_suporte"]: discord.PermissionOverwrite(speak=True),
     }
-    await cat.create_voice_channel(
-        "🎙️ COMANDO (Shotcaller)",
-        overwrites=ch_comando_overwrites
-    )
+    await get_or_create_channel(guild, "🎙️ COMANDO (Shotcaller)", cat, is_text=False, overwrites=ow_ch_comando)
 
 async def setup_roles_chat(guild, roles):
     """Cria a Categoria COMUNICAÇÃO DE ROLES (Privada por Role)"""
-    base_overwrites = {
+    print("Configurando Categoria: COMUNICAÇÃO DE ROLES...")
+    ow_cat = {
         roles["everyone"]: discord.PermissionOverwrite(read_messages=False),
         roles["mercenario"]: discord.PermissionOverwrite(read_messages=False), 
         roles["oficial"]: discord.PermissionOverwrite(read_messages=True), 
         roles["coach"]: discord.PermissionOverwrite(read_messages=True), 
     }
-    cat = await guild.create_category(
-        "🗣️ CATEGORIA: COMUNICAÇÃO DE ROLES",
-        overwrites=base_overwrites
-    )
+    cat = await get_or_create_category(guild, "🗣️ CATEGORIA: COMUNICAÇÃO DE ROLES", overwrites=ow_cat)
 
-    await cat.create_text_channel(
-        "🛡️ | chat-tanks",
-        overwrites={ roles["tank"]: discord.PermissionOverwrite(read_messages=True) }
-    )
-    await cat.create_text_channel(
-        "💚 | chat-healers",
-        overwrites={ roles["healer"]: discord.PermissionOverwrite(read_messages=True) }
-    )
-    await cat.create_text_channel(
-        "💥 | chat-dps",
-        overwrites={ roles["dps"]: discord.PermissionOverwrite(read_messages=True) }
-    )
-    await cat.create_text_channel(
-        "✨ | chat-suporte",
-        overwrites={ roles["suporte"]: discord.PermissionOverwrite(read_messages=True) }
-    )
+    await get_or_create_channel(guild, "🛡️ | chat-tanks", cat, overwrites={ roles["tank"]: discord.PermissionOverwrite(read_messages=True) })
+    await get_or_create_channel(guild, "💚 | chat-healers", cat, overwrites={ roles["healer"]: discord.PermissionOverwrite(read_messages=True) })
+    await get_or_create_channel(guild, "💥 | chat-dps", cat, overwrites={ roles["dps"]: discord.PermissionOverwrite(read_messages=True) })
+    await get_or_create_channel(guild, "✨ | chat-suporte", cat, overwrites={ roles["suporte"]: discord.PermissionOverwrite(read_messages=True) })
 
 async def setup_mentoria(guild, roles):
     """Cria a Categoria MENTORIA (VODS)"""
-    cat = await guild.create_category(
-        "📈 CATEGORIA: MENTORIA (VODS)",
-        overwrites={
-            roles["everyone"]: discord.PermissionOverwrite(read_messages=False),
-            roles["mercenario"]: discord.PermissionOverwrite(read_messages=True),
-            roles["oficial"]: discord.PermissionOverwrite(read_messages=True),
-        }
-    )
+    print("Configurando Categoria: MENTORIA (VODS)...")
+    ow_cat = {
+        roles["everyone"]: discord.PermissionOverwrite(read_messages=False),
+        roles["mercenario"]: discord.PermissionOverwrite(read_messages=True),
+        roles["oficial"]: discord.PermissionOverwrite(read_messages=True),
+    }
+    cat = await get_or_create_category(guild, "📈 CATEGORIA: MENTORIA (VODS)", overwrites=ow_cat)
     
-    ch = await cat.create_text_channel(
-        "ℹ️ | como-gravar-e-postar",
-        overwrites={ roles["mercenario"]: discord.PermissionOverwrite(send_messages=False) }
-    )
-    await ch.send("**Tutorial de Gravação (VODs)**\n\nÉ obrigatório gravar suas ZvZs.\n1.  **Software:** Use OBS Studio, Nvidia ShadowPlay ou AMD ReLive.\n2.  **Upload:** Envie o vídeo para o YouTube como 'Não Listado'.\n3.  **Postagem:** Cole o link do YouTube no canal da sua *role* (ex: #🛡️ | vods-tank) após a ZvZ.")
+    ow_ch_info = { roles["mercenario"]: discord.PermissionOverwrite(send_messages=False) }
+    await get_or_create_channel(guild, "ℹ️ | como-gravar-e-postar", cat, overwrites=ow_ch_info)
 
-    ch = await cat.create_text_channel(
-        "🧑‍🏫 | feedback-dos-coaches",
-        overwrites={
-            roles["mercenario"]: discord.PermissionOverwrite(send_messages=False),
-            roles["coach"]: discord.PermissionOverwrite(send_messages=True),
-            roles["oficial"]: discord.PermissionOverwrite(send_messages=True),
-        }
-    )
-    await ch.send("Canal para os **Coaches e Líderes** darem *feedback* geral para o time após as lutas.\n\n(Apenas Coaches/Líderes podem escrever aqui).")
+    ow_ch_feedback = {
+        roles["mercenario"]: discord.PermissionOverwrite(send_messages=False),
+        roles["coach"]: discord.PermissionOverwrite(send_messages=True),
+        roles["oficial"]: discord.PermissionOverwrite(send_messages=True),
+    }
+    await get_or_create_channel(guild, "🧑‍🏫 | feedback-dos-coaches", cat, overwrites=ow_ch_feedback)
 
-    await cat.create_text_channel("🛡️ | vods-tank")
-    await cat.create_text_channel("💚 | vods-healer")
-    await cat.create_text_channel("💥 | vods-dps")
-    await cat.create_text_channel("✨ | vods-suporte")
-    await cat.create_voice_channel("📺 Sala de Análise 1")
-    await cat.create_voice_channel("📺 Sala de Análise 2")
+    await get_or_create_channel(guild, "🛡️ | vods-tank", cat)
+    await get_or_create_channel(guild, "💚 | vods-healer", cat)
+    await get_or_create_channel(guild, "💥 | vods-dps", cat)
+    await get_or_create_channel(guild, "✨ | vods-suporte", cat)
+    await get_or_create_channel(guild, "📺 Sala de Análise 1", cat, is_text=False)
+    await get_or_create_channel(guild, "📺 Sala de Análise 2", cat, is_text=False)
 
 async def setup_financeiro(guild, roles):
     """Cria a Categoria GESTÃO FINANCEIRA"""
-    cat = await guild.create_category(
-        "💰 CATEGORIA: GESTÃO FINANCEIRA",
-        overwrites={
-            roles["everyone"]: discord.PermissionOverwrite(read_messages=False),
-            roles["mercenario"]: discord.PermissionOverwrite(read_messages=True),
-            roles["oficial"]: discord.PermissionOverwrite(read_messages=True),
-        }
-    )
+    print("Configurando Categoria: GESTÃO FINANCEIRA...")
+    ow_cat = {
+        roles["everyone"]: discord.PermissionOverwrite(read_messages=False),
+        roles["mercenario"]: discord.PermissionOverwrite(read_messages=True),
+        roles["oficial"]: discord.PermissionOverwrite(read_messages=True),
+    }
+    cat = await get_or_create_category(guild, "💰 CATEGORIA: GESTÃO FINANCEIRA", overwrites=ow_cat)
     
-    ch = await cat.create_text_channel(
-        "ℹ️ | info-regear-e-loot",
-        overwrites={ roles["mercenario"]: discord.PermissionOverwrite(send_messages=False) }
-    )
-    await ch.send("**Regras de Regear e Loot Split**\n\n**Regear:**\n1.  O *core* cobre *regears* (T8.3 equivalente) em CTAs **obrigatórias**.\n2.  Para solicitar, poste o *print* da sua *kill* (morte) no canal #📦 | solicitar-regear.\n3.  Aguarde a aprovação de um Oficial.\n\n**Loot Split:**\n1.  Todo *loot* de ZvZ é recolhido pela liderança.\n2.  Uma taxa de X% é retida para o banco da guilda (regears, *hideout*).\n3.  O restante é dividido igualmente entre os presentes na CTA e pago semanalmente.")
-
-    ch = await cat.create_text_channel("📦 | solicitar-regear")
-    await ch.send("Use este canal **apenas** para postar o *screenshot* da sua morte e solicitar o *regear*.\n\nUm Oficial irá reagir com ✅ (Aprovado) ou ❌ (Negado).")
+    ow_ch_info = { roles["mercenario"]: discord.PermissionOverwrite(send_messages=False) }
+    await get_or_create_channel(guild, "ℹ️ | info-regear-e-loot", cat, overwrites=ow_ch_info)
     
-    ch = await cat.create_text_channel(
-        "🧾 | lootsplit-e-pagamentos",
-        overwrites={ roles["mercenario"]: discord.PermissionOverwrite(send_messages=False) }
-    )
-    await ch.send("Canal para a liderança postar os relatórios de **Loot Split** e confirmar os pagamentos.")
+    await get_or_create_channel(guild, "📦 | solicitar-regear", cat)
+    
+    ow_ch_logs = { roles["mercenario"]: discord.PermissionOverwrite(send_messages=False) }
+    await get_or_create_channel(guild, "🧾 | lootsplit-e-pagamentos", cat, overwrites=ow_ch_logs)
 
 async def setup_admin(guild, roles):
     """Cria a Categoria ADMINISTRAÇÃO (Privada para Oficiais)"""
-    cat = await guild.create_category(
-        "🔒 CATEGORIA: ADMINISTRAÇÃO",
-        overwrites={
-            roles["everyone"]: discord.PermissionOverwrite(read_messages=False),
-            roles["mercenario"]: discord.PermissionOverwrite(read_messages=False),
-            roles["oficial"]: discord.PermissionOverwrite(read_messages=True),
-            roles["lider"]: discord.PermissionOverwrite(read_messages=True),
-        }
-    )
+    print("Configurando Categoria: ADMINISTRAÇÃO...")
+    ow_cat = {
+        roles["everyone"]: discord.PermissionOverwrite(read_messages=False),
+        roles["mercenario"]: discord.PermissionOverwrite(read_messages=False),
+        roles["oficial"]: discord.PermissionOverwrite(read_messages=True),
+        roles["lider"]: discord.PermissionOverwrite(read_messages=True),
+    }
+    cat = await get_or_create_category(guild, "🔒 CATEGORIA: ADMINISTRAÇÃO", overwrites=ow_cat)
     
-    await cat.create_text_channel("💬 | chat-liderança")
-    await cat.create_text_channel("📊 | gerenciamento-core")
-    await cat.create_text_channel("✅ | regears-aprovados")
-    await cat.create_text_channel("🤖 | logs-do-bot")
-    await cat.create_voice_channel("🔒 Reunião de Oficiais")
-
+    await get_or_create_channel(guild, "💬 | chat-liderança", cat)
+    await get_or_create_channel(guild, "📊 | gerenciamento-core", cat)
+    await get_or_create_channel(guild, "✅ | regears-aprovados", cat)
+    await get_or_create_channel(guild, "🤖 | logs-do-bot", cat)
+    await get_or_create_channel(guild, "🔒 Reunião de Oficiais", cat, is_text=False)
 
 # --- A Classe Cog (Módulo) ---
 
@@ -291,40 +236,56 @@ class SetupCog(commands.Cog):
     
     def __init__(self, bot):
         self.bot = bot
-        print(">>> setup_cog.py FOI LIDO E INICIADO <<<") # Mensagem de diagnóstico
+        print(">>> setup_cog.py FOI LIDO E INICIADO <<<")
 
     @commands.slash_command(
         name="setup-servidor",
-        description="Configura este servidor do zero. (Apenas Admins)"
-        # Este comando agora é GLOBAL
+        description="Configura este servidor do zero de forma segura. (Apenas Admins)"
     )
     @commands.has_permissions(administrator=True)
     async def setup_servidor(self, ctx: discord.ApplicationContext):
         """Comando principal que constrói todo o servidor."""
         
-        # Responde ao usuário (apenas ele vê esta mensagem)
-        await ctx.respond("Comando `/setup-servidor` recebido! Iniciando a configuração...", ephemeral=True)
+        await ctx.respond("Comando `/setup-servidor` recebido! Iniciando a configuração segura (Idempotente)...", ephemeral=True)
         
         guild = ctx.guild
         
-        await ctx.channel.send(f"Iniciando a configuração completa do servidor '{guild.name}'...")
+        # Usamos followups para mensagens longas
+        main_message = await ctx.followup.send(f"Iniciando a configuração completa do servidor '{guild.name}'...")
         
-        # PASSO A: Criar Cargos
-        await ctx.channel.send("Criando cargos...")
-        roles = await create_roles(guild)
-        await ctx.channel.send("✅ Cargos criados.")
-        
-        # PASSO B-E: Criar Categorias, Canais e Mensagens
-        await setup_publico(guild, roles)
-        await setup_recepcao(guild, roles)
-        await setup_comunidade(guild, roles)
-        await setup_zvz(guild, roles)
-        await setup_roles_chat(guild, roles)
-        await setup_mentoria(guild, roles)
-        await setup_financeiro(guild, roles)
-        await setup_admin(guild, roles)
+        try:
+            # PASSO A: Criar Cargos
+            await main_message.edit(content="PASSO 1/9: Criando cargos...")
+            roles = await create_roles(guild)
+            
+            # PASSO B-E: Criar Categorias, Canais e Mensagens
+            await main_message.edit(content="PASSO 2/9: Configurando Categoria: PÚBLICO...")
+            await setup_publico(guild, roles)
+            await main_message.edit(content="PASSO 3/9: Configurando Categoria: RECEPÇÃO...")
+            await setup_recepcao(guild, roles)
+            await main_message.edit(content="PASSO 4/9: Configurando Categoria: COMUNIDADE...")
+            await setup_comunidade(guild, roles)
+            await main_message.edit(content="PASSO 5/9: Configurando Categoria: OPERAÇÕES ZVZ...")
+            await setup_zvz(guild, roles)
+            await main_message.edit(content="PASSO 6/9: Configurando Categoria: COMUNICAÇÃO DE ROLES...")
+            await setup_roles_chat(guild, roles)
+            await main_message.edit(content="PASSO 7/9: Configurando Categoria: MENTORIA (VODS)...")
+            await setup_mentoria(guild, roles)
+            await main_message.edit(content="PASSO 8/9: Configurando Categoria: GESTÃO FINANCEIRA...")
+            await setup_financeiro(guild, roles)
+            await main_message.edit(content="PASSO 9/9: Configurando Categoria: ADMINISTRAÇÃO...")
+            await setup_admin(guild, roles)
 
-        await ctx.channel.send("🚀 **Configuração do Servidor Concluída!** 🚀")
+            await main_message.edit(content="🚀 **Configuração do Servidor Concluída!** 🚀\nO servidor está pronto e o comando é seguro para ser executado novamente se necessário.")
+
+        except discord.Forbidden:
+            await main_message.edit(content="**ERRO DE PERMISSÃO:** O Bot não tem permissão para 'Gerir Cargos' ou 'Gerir Canais'. Verifique as permissões do cargo do Bot e tente novamente.")
+        except Exception as e:
+            await main_message.edit(content=f"**ERRO INESPERADO:** A configuração falhou.\n`{e}`")
+            print(f"Erro no comando '/setup-servidor': {e}")
+            import traceback
+            traceback.print_exc()
+
 
     @setup_servidor.error
     async def setup_servidor_error(self, ctx: discord.ApplicationContext, error):
@@ -337,7 +298,7 @@ class SetupCog(commands.Cog):
             import traceback
             traceback.print_exc()
 
-# Função obrigatória (agora async) que o main.py usa para carregar esta Cog
+# Função obrigatória que o main.py (refatorado) usa para carregar esta Cog
 async def setup(bot):
     await bot.add_cog(SetupCog(bot))
 
