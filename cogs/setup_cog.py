@@ -1,31 +1,45 @@
 import discord
 from discord.ext import commands
 
+# --- Helper: Get or Create Role ---
+async def get_or_create_role(guild: discord.Guild, name: str, **kwargs):
+    """
+    Tenta encontrar um cargo pelo nome (case-insensitive). Se não existir, cria-o.
+    Retorna o objeto do cargo (existente ou novo).
+    """
+    existing_role = next((r for r in guild.roles if r.name.lower() == name.lower()), None)
+    if existing_role:
+        print(f"Cargo '{name}' já existe. Ignorando criação.")
+        return existing_role
+
+    print(f"Criando cargo '{name}'...")
+    return await guild.create_role(name=name, **kwargs)
+
 # --- Funções Auxiliares de Criação ---
 # (Aqui estão as funções que criam os cargos, canais e permissões)
 
 async def create_roles(guild):
     """Cria todos os cargos necessários e retorna um dicionário."""
     
-    # Cargos de Hierarquia
-    r_recruta = await guild.create_role(name="Recruta", colour=discord.Colour.light_grey())
-    r_mercenario = await guild.create_role(name="Mercenário", colour=discord.Colour.green())
-    r_coach = await guild.create_role(name="Coach", colour=discord.Colour.blue())
-    r_shotcaller = await guild.create_role(name="Shotcaller", colour=discord.Colour.gold())
-    r_oficial = await guild.create_role(name="Oficial", colour=discord.Colour.purple())
-    r_lider = await guild.create_role(name="Líder", colour=discord.Colour.red())
+    # Cargos de Hierarquia (usa get_or_create_role)
+    r_recruta = await get_or_create_role(guild, name="Recruta", colour=discord.Colour.light_grey())
+    r_mercenario = await get_or_create_role(guild, name="Mercenário", colour=discord.Colour.green())
+    r_coach = await get_or_create_role(guild, name="Coach", colour=discord.Colour.blue())
+    r_shotcaller = await get_or_create_role(guild, name="Shotcaller", colour=discord.Colour.gold())
+    r_oficial = await get_or_create_role(guild, name="Oficial", colour=discord.Colour.purple())
+    r_lider = await get_or_create_role(guild, name="Líder", colour=discord.Colour.red())
 
     # Cargos de Role
-    r_tank = await guild.create_role(name="Tank", colour=discord.Colour(0x607d8b)) # Cinza
-    r_healer = await guild.create_role(name="Healer", colour=discord.Colour(0x4caf50)) # Verde
-    r_dps = await guild.create_role(name="DPS", colour=discord.Colour(0xf44336)) # Vermelho
-    r_suporte = await guild.create_role(name="Suporte", colour=discord.Colour(0x9c27b0)) # Roxo
+    r_tank = await get_or_create_role(guild, name="Tank", colour=discord.Colour(0x607d8b)) # Cinza
+    r_healer = await get_or_create_role(guild, name="Healer", colour=discord.Colour(0x4caf50)) # Verde
+    r_dps = await get_or_create_role(guild, name="DPS", colour=discord.Colour(0xf44336)) # Vermelho
+    r_suporte = await get_or_create_role(guild, name="Suporte", colour=discord.Colour(0x9c27b0)) # Roxo
 
     # Cargos de Comunicação ZvZ
-    r_lider_tank = await guild.create_role(name="Líder-Tank")
-    r_lider_healer = await guild.create_role(name="Líder-Healer")
-    r_lider_dps = await guild.create_role(name="Líder-DPS")
-    r_lider_suporte = await guild.create_role(name="Líder-Suporte")
+    r_lider_tank = await get_or_create_role(guild, name="Líder-Tank")
+    r_lider_healer = await get_or_create_role(guild, name="Líder-Healer")
+    r_lider_dps = await get_or_create_role(guild, name="Líder-DPS")
+    r_lider_suporte = await get_or_create_role(guild, name="Líder-Suporte")
 
     return {
         "everyone": guild.default_role,

@@ -1,6 +1,7 @@
 import discord
 from discord.ext import commands
 import os
+import asyncio
 from dotenv import load_dotenv
 
 # --- 1. Carregamento do Token ---
@@ -20,6 +21,28 @@ intents.members = True
 # --- 3. Inicialização do Bot ---
 bot = commands.Bot(command_prefix='.', intents=intents)
 
+# Função para carregar dinamicamente todas as cogs em /cogs
+async def load_cogs(bot):
+    """Carrega dinamicamente todas as Cogs da pasta /cogs."""
+    cogs_dir = "cogs"
+    print("--- Carregando Módulos (Cogs) ---")
+    if not os.path.isdir(cogs_dir):
+        print(f"  [AVISO] Pasta '{cogs_dir}' não encontrada. Nenhuma cog carregada.")
+        print("-----------------------------------")
+        return
+
+    for filename in os.listdir(cogs_dir):
+        # Carrega apenas ficheiros .py que não sejam de inicialização
+        if filename.endswith(".py") and not filename.startswith("__"):
+            try:
+                # Converte 'nome_ficheiro.py' para 'cogs.nome_ficheiro'
+                extension = f"{cogs_dir}.{filename[:-3]}"
+                await bot.load_extension(extension)
+                print(f"  [OK] Módulo '{filename}' carregado.")
+            except Exception as e:
+                print(f"  [FALHA] Módulo '{filename}': {e}")
+    print("-----------------------------------")
+
 # --- 4. Comando de Diagnóstico (Global) ---
 @bot.slash_command(
     name="ping",
@@ -37,17 +60,12 @@ async def on_ready():
     """Chamado quando o bot está pronto e online."""
     print(f'Bot logado como {bot.user}')
     
-    try:
-        await bot.load_extension("cogs.setup_cog")
-        print("Módulo (Cog) 'setup_cog' carregado com sucesso.")
-    except Exception as e:
-        print(f"Falha ao carregar a cog 'setup_cog': {e}")
-        return
+    # Carrega todas as cogs dinamicamente
+    await load_cogs(bot)
 
     # --- Sincronização GLOBAL (para Discloud) ---
     try:
-        print("Sincronizando comandos globalmente... (Pode demorar até 1 hora)")
-        # Sincroniza globalmente.
+        print("Sincronizando comandos globalmente...")
         await bot.tree.sync() 
         print("Sincronização global enviada!")
     except Exception as e:
