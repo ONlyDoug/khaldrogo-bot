@@ -5,7 +5,8 @@ from discord.utils import get
 import asyncio
 import traceback
 
-# --- Nomes das Categorias v2.3 ---
+# --- Nomes das Categorias v2.4 ---
+# A lista permanece a mesma, pois apenas modificámos o *interior* de uma categoria
 CAT_NAMES = [
     "🌎 PÚBLICO",
     "🏁 RECEPÇÃO (ALIANÇA)",
@@ -67,11 +68,11 @@ async def create_category_and_channels(guild: discord.Guild, name: str, channels
 
     return category
 
-# --- Definição da Estrutura v2.3 ---
+# --- Definição da Estrutura v2.4 ---
 
-async def create_roles_v2_3(guild: discord.Guild):
-    """Cria os cargos da estrutura v2.3 (com DG Avalon)."""
-    print("Iniciando criação/verificação de Cargos v2.3...")
+async def create_roles_v2_4(guild: discord.Guild): # Renomeado para v2_4 por clareza
+    """Cria os cargos da estrutura v2.3 (v2.4 não muda cargos)."""
+    print("Iniciando criação/verificação de Cargos v2.4...")
     r = {
         "everyone": guild.default_role,
         # Gestão
@@ -82,10 +83,7 @@ async def create_roles_v2_3(guild: discord.Guild):
         "aliado_pacto": await create_role_if_not_exists(guild, name="Aliado (Pacto Sombrio)", colour=discord.Colour.teal()),
         "core_zvz": await create_role_if_not_exists(guild, name="Core ZvZ (IVEXI)", colour=discord.Colour.green(), hoist=True),
         "recruta_core": await create_role_if_not_exists(guild, name="Recruta (Core)", colour=discord.Colour.light_grey()),
-        
-        # ----- CORREÇÃO APLICADA AQUI -----
-        "dg_avaloniana": await create_role_if_not_exists(guild, name="DG Avaloniana", colour=discord.Colour.magenta(), hoist=True), # Corrigido de .nitro_pink() para .magenta()
-        
+        "dg_avaloniana": await create_role_if_not_exists(guild, name="DG Avaloniana", colour=discord.Colour.magenta(), hoist=True),
         # Funcionais (Core)
         "tank": await create_role_if_not_exists(guild, name="Tank", colour=discord.Colour(0x607d8b)),
         "healer": await create_role_if_not_exists(guild, name="Healer", colour=discord.Colour(0x4caf50)),
@@ -98,13 +96,13 @@ async def create_roles_v2_3(guild: discord.Guild):
         "lider_dps": await create_role_if_not_exists(guild, name="Líder-DPS"),
         "lider_suporte": await create_role_if_not_exists(guild, name="Líder-Suporte"),
     }
-    print("Criação/Verificação de Cargos v2.3 concluída.")
+    print("Criação/Verificação de Cargos v2.4 concluída.")
     return r
 
-def get_channel_definitions_v2_3(roles: dict):
-    """Retorna o dicionário completo da estrutura de canais v2.3."""
+def get_channel_definitions_v2_4(roles: dict):
+    """Retorna o dicionário completo da estrutura de canais v2.4."""
 
-    # --- Permissões Base ---
+    # --- Permissões Base (Sem alteração da v2.3) ---
     ow_publico = { roles.get("everyone"): discord.PermissionOverwrite(read_messages=True) }
     
     ow_alianca = {
@@ -175,7 +173,7 @@ def get_channel_definitions_v2_3(roles: dict):
         roles.get("lider_ivexi"): discord.PermissionOverwrite(read_messages=True),
     }
 
-    # --- Definições de Canais v2.3 ---
+    # --- Definições de Canais v2.4 ---
     return {
         "🌎 PÚBLICO": {
             "overwrites": ow_publico,
@@ -201,9 +199,15 @@ def get_channel_definitions_v2_3(roles: dict):
                  "message": "Use este canal para comandos de bot (ex: verificar builds, status, etc.)."}
             ]
         },
+        
+        # ----- CATEGORIA MODIFICADA (v2.4) -----
         "🏛️ ALIANÇA: PACTO SOMBRIO": {
             "overwrites": ow_alianca,
             "channels": [
+                # Canal de CTA da Aliança (NOVO)
+                {"name": "❗ | cta-alianca", "overwrites": {roles.get("aliado_pacto"): discord.PermissionOverwrite(send_messages=False)},
+                 "message": "Canal para **CTAs da Aliança** (Defesas, Roaming, Conteúdo conjunto).\n\n(Apenas Líderes podem postar aqui)."},
+                # Canais existentes
                 {"name": "💬 | chat-geral-alianca",
                  "message": "Este é o canal social principal da aliança. Sinta-se em casa!"},
                 {"name": " pve-grupais",
@@ -212,11 +216,15 @@ def get_channel_definitions_v2_3(roles: dict):
                  "message": "Organização de Ganking, Roaming, Defesa de Hideouts, Castelos, etc."},
                 {"name": "💰 | loot-e-sorteios-alianca",
                  "message": "Poste aqui os seus *prints* de *loot* incrível e participe em sorteios da aliança!"},
-                {"name": " call-geral-1", "is_text": False},
-                {"name": " call-geral-2", "is_text": False},
-                {"name": " afk", "is_text": False}
+                # Calls com padrão de emoji (MELHORADO)
+                {"name": "🎧 | Lobby Aliança", "is_text": False},
+                {"name": "🔊 | Call Aliança 1", "is_text": False},
+                {"name": "🔊 | Call Aliança 2", "is_text": False},
+                {"name": "💤 | AFK", "is_text": False}
             ]
         },
+        # -----------------------------------
+        
         "🌀 DG AVALONIANA": {
             "overwrites": ow_dg_avaloniana,
             "channels": [
@@ -320,12 +328,12 @@ class SetupCog(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        print(f">>> setup_cog.py (v2.3.1 - Corrigido) FOI LIDO E INICIADO <<<")
+        print(f">>> setup_cog.py (v2.4 - QG Aliança + DG Ava) FOI LIDO E INICIADO <<<")
 
     async def delete_existing_structure(self, guild: discord.Guild, message_to_edit: discord.Message):
         """Apaga as categorias (e seus canais) gerenciadas pelo bot."""
         await message_to_edit.edit(content="PASSO 0/11: Apagando estrutura antiga (categorias e canais)...")
-        print("Iniciando limpeza da estrutura antiga (v2.3)...")
+        print("Iniciando limpeza da estrutura antiga (v2.4)...")
         deleted_count = 0
         
         categories_to_delete = [cat for cat in guild.categories if cat.name in CAT_NAMES]
@@ -336,14 +344,14 @@ class SetupCog(commands.Cog):
                 channels_in_category = list(category.channels)
                 for channel in channels_in_category:
                     try:
-                        await channel.delete(reason="Recriação da estrutura (v2.3)")
+                        await channel.delete(reason="Recriação da estrutura (v2.4)")
                         deleted_count += 1
                         print(f"    Canal '{channel.name}' apagado.")
                         await asyncio.sleep(0.5)
                     except Exception as e:
                         print(f"    [ERRO] Falha ao apagar canal '{channel.name}': {e}")
                 
-                await category.delete(reason="Recriação da estrutura (v2.3)")
+                await category.delete(reason="Recriação da estrutura (v2.4)")
                 deleted_count += 1
                 print(f"  Categoria '{category.name}' apagada.")
                 await asyncio.sleep(0.5)
@@ -362,7 +370,7 @@ class SetupCog(commands.Cog):
     @app_commands.checks.has_permissions(administrator=True)
     async def setup_servidor(self, interaction: discord.Interaction):
         await interaction.response.send_message(
-            "⚠️ **AVISO (v2.3):** Este comando irá **APAGAR** as categorias do QG (Aliança, Core e DG Ava) e recriá-las do zero!\n"
+            "⚠️ **AVISO (v2.4):** Este comando irá **APAGAR** as categorias do QG (Aliança, Core e DG Ava) e recriá-las do zero!\n"
             "Confirme digitando `SIM APAGAR TUDO` no chat em 30 segundos.",
             ephemeral=True
         )
@@ -383,19 +391,19 @@ class SetupCog(commands.Cog):
 
         # ---- INÍCIO DA EXECUÇÃO REAL ----
         guild = interaction.guild
-        main_message = await interaction.followup.send(f"🔥 Confirmado! Iniciando a recriação da Estrutura v2.3 (QG Pacto Sombrio + DG Ava)...")
+        main_message = await interaction.followup.send(f"🔥 Confirmado! Iniciando a recriação da Estrutura v2.4 (QG Pacto Sombrio + DG Ava)...")
 
         try:
             # PASSO 0: Apagar Estrutura Antiga
             await self.delete_existing_structure(guild, main_message)
 
             # PASSO 1: Criar Cargos
-            await main_message.edit(content="PASSO 1/11: Verificando/Criando cargos v2.3...")
-            roles = await create_roles_v2_3(guild)
+            await main_message.edit(content="PASSO 1/11: Verificando/Criando cargos v2.4...")
+            roles = await create_roles_v2_4(guild)
 
             # PASSO 2 a 11: Recriar Categorias e Canais
             
-            all_definitions = get_channel_definitions_v2_3(roles)
+            all_definitions = get_channel_definitions_v2_4(roles)
 
             categorias_para_criar = [
                 "🌎 PÚBLICO",
@@ -425,7 +433,7 @@ class SetupCog(commands.Cog):
                  await create_category_and_channels(guild, cat_name, channels_list, cat_overwrites)
                  await asyncio.sleep(0.5)
 
-            await main_message.edit(content="🚀 **Recriação Completa (v2.3) do QG Concluída!** 🚀")
+            await main_message.edit(content="🚀 **Recriação Completa (v2.4) do QG Concluída!** 🚀")
 
         except discord.Forbidden as e:
             await main_message.edit(content=f"**ERRO DE PERMISSÃO DURANTE A CRIAÇÃO:** {e}. Verifique as permissões do bot.")
